@@ -1,0 +1,10 @@
+server/GitHubLookupService.class
+client/GitHubController$1.class
+server/GitHubController.class
+server/User.class
+shared/TimedResponse.class
+client/GitHubController.class
+shared/ServerResponse.class
+server/ServerApplication.class
+shared/ClientResponse.class
+client/ClientApplication.class
