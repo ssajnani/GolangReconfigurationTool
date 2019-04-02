@@ -9,6 +9,7 @@ public class POJOModelController {
 	public POJOModelController(final POJOModelService pojoService) {
 
 		get("/all", (req, res) -> pojoService.getAllComponents(), json());
+		get("/diff", (req, res) -> pojoService.getDiffOfResources(), json());
 
 //		get("/component/:id", (req, res) -> {
 //			String id = req.params(":id");
@@ -23,7 +24,11 @@ public class POJOModelController {
 			String namespace = req.queryParams("namespace");
 			String path = req.queryParams("filepath");
 		 	String type = req.queryParams("type");
-			String[] array = {namespace, path};
+		 	String dryRun = "None";
+		 	if (req.queryParams("dryRun") != null) {
+			    dryRun = req.queryParams("dryRun").replaceAll("[^a-zA-Z0-9]","");
+			}
+			String[] array = {namespace, path, dryRun};
 			POJOModelAction action = new POJOModelAction(type);
 			String result = action.create(array);
 			return result;
@@ -34,7 +39,11 @@ public class POJOModelController {
 			String namespace = req.queryParams("namespace");
 			String path = req.queryParams("filepath");
 		 	String type = req.queryParams("type");
-			String[] array = {name, namespace, path};
+		 	String dryRun = "None";
+		 	if (req.queryParams("dryRun") != null) {
+			    dryRun = req.queryParams("dryRun").replaceAll("[^a-zA-Z0-9]","");
+			}
+			String[] array = {name, namespace, path, dryRun};
 			POJOModelAction action = new POJOModelAction(type);
 			String result = action.update(array);
 			return result;
@@ -44,7 +53,11 @@ public class POJOModelController {
 			String namespace = req.queryParams("namespace");
 			String name = req.queryParams("name");
 		 	String type = req.queryParams("type");
-			String[] array = {name, namespace};
+		 	String dryRun = "None";
+		 	if (req.queryParams("dryRun") != null) {
+			    dryRun = req.queryParams("dryRun").replaceAll("[^a-zA-Z0-9]","");
+			}
+			String[] array = {name, namespace, dryRun};
 			POJOModelAction action = new POJOModelAction(type);
 			String result = action.delete(array);
 			System.out.println(result);
@@ -53,7 +66,11 @@ public class POJOModelController {
 		post("/create", (req, res) -> {
 			String path = req.queryParams("filepath");
 			String type = req.queryParams("type");
-			String[] array = {path};
+		 	String dryRun = "None";
+		 	if (req.queryParams("dryRun") != null) {
+			    dryRun = req.queryParams("dryRun").replaceAll("[^a-zA-Z0-9]","");
+			}
+			String[] array = {path, dryRun};
 			POJOModelAction action = new POJOModelAction(type);
 			String result = action.create(array);
 			return result;
@@ -63,7 +80,11 @@ public class POJOModelController {
 			String name = req.queryParams("name");
 			String path = req.queryParams("filepath");
 			String type = req.queryParams("type");
-			String[] array = {name, path};
+		 	String dryRun = "None";
+		 	if (req.queryParams("dryRun") != null) {
+			    dryRun = req.queryParams("dryRun").replaceAll("[^a-zA-Z0-9]","");
+			}
+			String[] array = {name, path, dryRun};
 			POJOModelAction action = new POJOModelAction(type);
 			String result = action.update(array);
 			return result;
@@ -72,7 +93,11 @@ public class POJOModelController {
 		post("/delete", (req, res) -> {
 			String name = req.queryParams("name");
 			String type = req.queryParams("type");
-			String[] array = {name};
+		 	String dryRun = "None";
+		 	if (req.queryParams("dryRun") != null) {
+			    dryRun = req.queryParams("dryRun").replaceAll("[^a-zA-Z0-9]","");
+			}
+			String[] array = {name, dryRun};
 			POJOModelAction action = new POJOModelAction(type);
 			String result = action.delete(array);
 			return result;

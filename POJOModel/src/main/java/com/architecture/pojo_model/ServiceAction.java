@@ -23,7 +23,7 @@ public class ServiceAction implements AtomicAction {
 	    }
 	}
 	public String create(String[] info){
-	    if (info.length < 2){
+	    if (info.length < 3){
 	    	return "Error: Please provide the namespace and the yaml file path in a string array in that order.";
 	    } else {
 		try {
@@ -41,7 +41,7 @@ public class ServiceAction implements AtomicAction {
 	    }	
 	}
 	public String delete(String[] info) {
-	    if (info.length < 2){
+	    if (info.length < 3){
 	    	return "Error: Please provide a valid service name and the namespace in a string array in that order.";
 	    } else {
 		try {
@@ -65,7 +65,7 @@ public class ServiceAction implements AtomicAction {
 	    }	
 	} 
 	public String update(String[] info) {
-	    if (info.length < 3){
+	    if (info.length < 4){
 	    	return "Error: Please provide a valid service name, namespace, and yaml file path in a string array in that order.";
 	    } else {
 		try {
@@ -89,7 +89,7 @@ public class ServiceAction implements AtomicAction {
 	    }	
 	}
 	public Object read(String[] info) {
-	    if (info.length < 2){
+	    if (info.length < 3){
 	    	return "Error: Please provide a valid service name and namespace in a string array in that order.";
 	    } else {
 		try {

@@ -16,12 +16,12 @@ import java.util.concurrent.CompletableFuture;
 
 @RestController
 public class GitHubController {
-    private static final String BASE_URL = "http://localhost:8080/user/";
+    private static final String BASE_URL = "http://localhost:8080/api/";
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final AsyncRestTemplate asyncRestTemplate = new AsyncRestTemplate();
 
-    @RequestMapping("/sync/user/{name}")
+    @RequestMapping("/integer")
     public ClientResponse findUserSync(@PathVariable(value = "name") String name) {
         long start = System.currentTimeMillis();
         ResponseEntity<ServerResponse> entity = restTemplate.getForEntity(BASE_URL + name, ServerResponse.class);
@@ -32,7 +32,7 @@ public class GitHubController {
         return clientResponse;
     }
 
-    @RequestMapping("/async/user/{name}")
+    @RequestMapping("/string")
     public CompletableFuture<ResponseEntity<ClientResponse>> findUserAsync(@PathVariable(value = "name") String name) {
         long start = System.currentTimeMillis();
         CompletableFuture<ResponseEntity<ClientResponse>> result = new CompletableFuture<>();
