@@ -1,4 +1,6 @@
 package com.architecture.pojo_model;
+import java.util.stream.Collectors;
+import com.google.gson.*;
 import java.util.*;
 import io.kubernetes.client.util.Yaml;
 import java.io.*;
@@ -28,12 +30,18 @@ public class PodAction implements AtomicAction {
 	    } else {
 		try {
 		    V1Pod body = (V1Pod) Yaml.load(new File(info[1]));
-	            V1Pod result = api.createNamespacedPod(info[0], body, null, null, null);
-		    Map<String, ArrayList> model = modelService.getAllComponents();
+		    V1Pod result = body;
+		    Boolean run = false;
+                    if (info[2] != null && info[2].equals("All")){
+                        run = true;
+                    } else {
+                        result = api.createNamespacedPod(info[0], body, null, null, null);
+		    }
+		    Map<String, ArrayList> model = modelService.getAllComponents(run);
                     ArrayList<V1Pod> podList = model.get("Pod");
 		    podList.add(result);
 		    model.put("Pod", podList);
-		    modelService.setAllComponents(model);
+		    modelService.setAllComponents(model, run);
 		    return "Success";
 		} catch (Exception e) {
 		    return e.getMessage();
@@ -46,46 +54,66 @@ public class PodAction implements AtomicAction {
 	    } else {
 		try {
 		    V1DeleteOptions body = new V1DeleteOptions();
-	            api.deleteNamespacedPod(info[0], info[1], body, null, null, null,null, null);
-                    Map<String, ArrayList> model = modelService.getAllComponents();
+                    Boolean run = false;
+		    if (info[2] != null && info[2].equals("All")){
+                        run = true;
+                    } else {
+			try {
+	                    api.deleteNamespacedPod(info[0], info[1], body, null, null, null,null, null);
+			} catch(Exception e) {
+                            
+			}
+		    }
+                    Map<String, ArrayList> model = modelService.getAllComponents(run);
                     ArrayList<V1Pod> podList = model.get("Pod");
 		    int listSize = podList.size();
 		    for (int i = 0; i < listSize; i++) {
                         V1Pod pod = podList.get(i);
-			if (pod.getMetadata().getName() == info[0] && pod.getMetadata().getNamespace() == info[1]){
+			if (pod.getMetadata().getName().equals(info[0]) && pod.getMetadata().getNamespace().equals(info[1])){
+			    List<V1OwnerReference> references = pod.getMetadata().getOwnerReferences();
+			    if (references.size() > 0) {
+				    return "Cannot delete pod because it is owned by: " + references.stream().map( n -> n.toString()).collect( Collectors.joining( "," ));
+			    }
 			    podList.remove(i);
+			    break;
 			}
                     }
 		    model.put("Pod", podList);
-		    modelService.setAllComponents(model);
+		    modelService.setAllComponents(model, run);
 		    return "Success";
 		} catch (Exception e) {
-		    if (e.getMessage().contains("java.lang.IllegalStateException: Expected a string but was BEGIN_OBJECT")) {
-		        return "Success";
-		    } else {
-			return e.getMessage();
-		    }
+		    return e.getMessage();
 		}
 	    }	
 	} 
 	public String update(String[] info) {
 	    if (info.length < 4){
-	    	return "Error: Please provide a valid pod name, namespace, and yaml file path in a string array in that order.";
+	    	return "Error: Please provide a valid pod name, namespace, and patch string in a string array in that order.";
 	    } else {
 		try {
-		    V1Pod body = (V1Pod) Yaml.load(new File(info[2]));
-	            V1Pod result = api.patchNamespacedPod(info[0], info[1], body, null, null);
-                    Map<String, ArrayList> model = modelService.getAllComponents();
+                    ArrayList<JsonObject> arr = new ArrayList<>();
+                    arr.add(((JsonElement) modelService.deserialize(info
+[2], JsonElement.class)).getAsJsonObject());
+	            V1Pod result = api.patchNamespacedPod(info[0], info[1], arr, null, info[3]);
+                    Boolean run = false;
+                    if (info[3] != null && info[3].equals("All")){
+                        run = true;
+                    }
+                    Map<String, ArrayList> model = modelService.getAllComponents(run);
                     ArrayList<V1Pod> podList = model.get("Pod");
 		    int listSize = podList.size();
 		    for (int i = 0; i < listSize; i++) {
                         V1Pod pod = podList.get(i);
+			List<V1OwnerReference> references = pod.getMetadata().getOwnerReferences();
+			if (references.size() > 0) {
+			    return "Cannot update pod because it is owned by: " + references.stream().map( n -> n.toString()).collect( Collectors.joining( "," ));
+			}
 			if (pod.getMetadata().getName() == info[0] && pod.getMetadata().getNamespace() == info[1]){
 			    podList.set(i, result);
 			}
                     }
 		    model.put("Pod", podList);
-		    modelService.setAllComponents(model);
+		    modelService.setAllComponents(model, run);
 		    return "Success";
 		} catch (Exception e) {
 		    return e.getMessage();

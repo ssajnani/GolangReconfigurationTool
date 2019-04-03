@@ -1,5 +1,6 @@
 package com.architecture.pojo_model;
 import java.util.*;
+import com.google.gson.*;
 import java.lang.reflect.*;
 import java.util.stream.Collectors;
 import org.reflections.Reflections;
@@ -28,8 +29,30 @@ public class POJOModelService {
         private static Map<String, Map<String, Map<String, ArrayList>>> relationshipsDryRun = new HashMap<String, Map<String, Map<String, ArrayList>>>();
 	//private componentTypeListSize = 12;	
 	private static Map<String, ArrayList> componentsDryRun = new HashMap<>();
+	private static Map<String, ArrayList> differenceComp = new HashMap<>();
 	private static JsonUtil jsonUtil = new JsonUtil();
+	private static Boolean triggerRefresh = false;
 	static {
+	    refresh(20000);
+	}
+	public static void setTriggerRefresh(Boolean val) {
+	    triggerRefresh = val;
+	}
+	public static Boolean getTriggerRefresh() {
+	    return triggerRefresh;
+	}
+	public static void refresh(int timeout) {
+            while (triggerRefresh) {
+                try {
+                   Thread.sleep(timeout);
+		   initialize();
+                } catch (InterruptedException e) {
+                    System.out.println("InterruptedException Exception" + e.getMessage());
+                }
+            }
+	    initialize();
+	}
+	public static void initialize() {
 	    try{
 		
 	        for (String resourceType : accessibleListsCoreV1Api) {
@@ -83,6 +106,10 @@ public class POJOModelService {
 		return components;
 	    }
 	}
+	public Object deserialize(String jsonStr, Class<?> targetClass) {
+	    Object obj = (new Gson()).fromJson(jsonStr, targetClass);
+            return obj;
+	}
 	public void setAllComponents(Map<String, ArrayList> newMap){
 	    components = newMap;
 	}
@@ -104,26 +131,47 @@ public class POJOModelService {
 	public void setRelationships(Map<String, Map<String, Map<String, ArrayList>>> relations){
 	    relationships = relations;
 	}
-	public String getDiffOfResources() {
+	public Map<String, ArrayList> getDiffOfResources() {
 	    try{
+
+	    differenceComp = new HashMap<>();
 	    for (String key : components.keySet()) {
 	        ArrayList tempComp = (ArrayList) components.get(key).clone();
 	        ArrayList tempCompDry = (ArrayList) componentsDryRun.get(key).clone();
-		ArrayList<String> resultComp = (ArrayList) tempComp.stream().map(thing -> {
+		ArrayList<String> resultComp = getNames(tempComp, key);
+		ArrayList<String> resultDryComp = getNames(tempCompDry, key);
+		ArrayList<String> resultCompCopy = (ArrayList) resultComp.clone();
+		ArrayList<String> resultCompDryCopy = (ArrayList) resultDryComp.clone();
+		resultCompCopy.removeAll(resultDryComp);
+		resultCompDryCopy.removeAll(resultComp);
+		resultComp.retainAll(resultDryComp);
+		differenceComp.put("ComponentsNotDry"+key, resultCompCopy);
+		differenceComp.put("DryNotComponents"+key, resultCompDryCopy);
+		differenceComp.put("Common"+key, resultComp);
+	    } 
+	        return differenceComp;
+	    } catch(Exception e) {
+	        differenceComp.put("Failed: ", (ArrayList) Arrays.asList(e.getStackTrace()));
+	        return differenceComp;
+	    }
+	}
+	public ArrayList<String> getNames(ArrayList var, String key) {
+		ArrayList<String> resultComp = (ArrayList) var.stream().map(thing -> {
 	            try{
-		    Method m = thing.getClass().getMethod("getMetadata");
-	            V1ObjectMeta meta = (V1ObjectMeta) m.invoke(thing);
-		    return meta.getName();
+			if (key == "Container") {
+		            Method m = thing.getClass().getMethod("getName");
+	                    String name = (String) m.invoke(thing);
+			    return name;
+			} else {
+		            Method m = thing.getClass().getMethod("getMetadata");
+	                    V1ObjectMeta meta = (V1ObjectMeta) m.invoke(thing);
+		            return meta.getName();
+			}
 		    } catch(Exception e) {
-		    return "Failed";
+		        return "Failed";
 		    }
 		}).collect(Collectors.toList());
-		System.out.println(resultComp);
-	    } 
-	    return "Success";
-	    } catch(Exception e) {
-	    return "Failed";
-	    }
+		return resultComp;
 	}
 	public Map<String, ArrayList> getAllComponents(Boolean dryRun){
 	    try{
@@ -172,9 +220,27 @@ public class POJOModelService {
 		relationships = relations;
 	    }
 	}
-	public static void synchronizeDryRun() {
-	    relationshipsDryRun = relationships;
-	    componentsDryRun = components;
+	public static String synchronizeDryRun() {
+	    for (String key : components.keySet()) {
+	         componentsDryRun.put(key, (ArrayList) components.get(key).clone());
+	    }
+	    for (String key : relationships.keySet()) {
+		if (!relationshipsDryRun.containsKey(key)){
+		    relationshipsDryRun.put(key, new HashMap<String, Map<String, ArrayList>>());
+		}
+		for (String nextKey : relationships.get(key).keySet()) {
+		    if (!relationshipsDryRun.get(key).containsKey(nextKey)){
+		        relationshipsDryRun.get(key).put(nextKey, new HashMap<String, ArrayList>());
+		    }
+		    for (String finalKey : relationships.get(key).get(nextKey).keySet()){
+		        if (!relationshipsDryRun.get(key).get(nextKey).containsKey(finalKey)){
+		            relationshipsDryRun.get(key).get(nextKey).put(finalKey, (ArrayList) relationships.get(key).get(nextKey).get(finalKey).clone());
+		        }
+		    
+		    }
+		}
+	    }
+	    return "Success";
 	}
 	public static void getResources(String set, Boolean namespaced, String apiType){
             try{

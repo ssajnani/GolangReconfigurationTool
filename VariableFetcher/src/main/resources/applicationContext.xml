@@ -11,6 +11,7 @@
 
 
   <bean id="intAdapter" class="server.IntAdapter" />
+  <bean id="intAdapter2" class="server.TestAdapter" />
 
   <bean id="stringAdapter" class="server.StringAdapter">
 </bean>

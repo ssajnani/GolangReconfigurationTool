@@ -1,6 +1,8 @@
 package com.architecture.pojo_model;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.lang.*;
+import com.google.gson.*;
 import io.kubernetes.client.util.Yaml;
 import java.io.*;
 import io.kubernetes.client.ApiClient;
@@ -23,7 +25,7 @@ public class DeploymentAction implements AtomicAction {
                modelService = new POJOModelService();
                Configuration.setDefaultApiClient(client);
             } catch(Throwable e){
-                System.out.println(e.getMessage());
+                e.printStackTrace();
             }
         }	
 	public String create(String[] info){
@@ -32,18 +34,28 @@ public class DeploymentAction implements AtomicAction {
 	    } else {
 		try {
 	            V1Deployment body = (V1Deployment) Yaml.load(new File(info[1]));
-	            V1Deployment result = api.createNamespacedDeployment(info[0], body, false, null, null);
-		    Thread.sleep(100);
+		    V1Deployment result = body;
 	            Boolean run = false;
-	            if (info[2].contains("All")){
+	            if (info[2] != null && info[2].equals("All")){
 		        run = true;
-	            }
-
-		    modelUpdateCreate(result, run);
-		    return "Success";
+	            } else {
+		    
+	                result = api.createNamespacedDeployment(info[0], body, false, null, info[2]);
+		    }
+	            Map<String, ArrayList> model = modelService.getAllComponents(run);
+		    Thread.sleep(100);
+		    final V1Deployment finDep = result; 
+	            if (!model.get("Deployment").stream().anyMatch(c -> {
+	                V1Deployment d = (V1Deployment) c;
+			return d.getMetadata().getName().equals(finDep.getMetadata().getName());
+		    })) {
+			return modelUpdateCreate(result, run, info[0]);
+		    } else {
+			return "Deployment already exists";
+		    }
 		} catch (Throwable e) {
 		    System.out.println(e);
-		    return e.getMessage();
+                    return e.toString() + Arrays.toString(e.getStackTrace());
 		}
 	    }	
 	}
@@ -54,48 +66,59 @@ public class DeploymentAction implements AtomicAction {
 		try {
 		    V1DeleteOptions body = new V1DeleteOptions();
 	            Boolean run = false;
-	            if (info[2].contains("All")){
+	            if (info[2] != null && info[2].equals("All")){
 		        run = true;
-	            }
-	            if (!run){
+	            } else {
 		        api.deleteNamespacedDeployment(info[0], info[1], body, null, null,0,null, null);
 		    }
                     Map<String, ArrayList> model = modelService.getAllComponents(run);
 		    modelUpdateDelete(info[0], "Deployment", run);
                     ArrayList<V1Deployment> deploymentList = model.get("Deployment");
 		    int listSize = deploymentList.size();
+		    Boolean found = false;
 		    for (int i = 0; i < listSize; i++) {
                         V1Deployment deployment = deploymentList.get(i);
-			if (deployment.getMetadata().getName() == info[0] && deployment.getMetadata().getNamespace() == info[1]){
+			if (deployment.getMetadata().getName().equals(info[0]) && deployment.getMetadata().getNamespace().equals(info[1])){
 			    deploymentList.remove(i);
+			    found = true;
+			    break;
 			}
                     }
 		    model.put("Deployment", deploymentList);
 		    modelService.setAllComponents(model, run);
-		    return "Success";
+		    if (found) {
+		        return "Success";
+		    } else {
+			return "No deployment with that name exists";
+		    }
 		} catch (Throwable e) {
-		    return e.getMessage();
+		    return Arrays.toString(e.getStackTrace());
 		}
 	    }
 	} 
 	public String update(String[] info) {
 	    if (info.length < 4){
-	    	return "Error: Please provide a valid deployment name, namespace, and yaml file path in a string array in that order.";
+	    	return "Error: Please provide a valid deployment name, namespace, and a valid patch string in a string array in that order.";
 	    } else {
 		try {
 		    
-	            V1Deployment body = (V1Deployment) Yaml.load(new File(info[2]));
-	            V1Deployment result = api.patchNamespacedDeployment(info[0], info[1], body, null, null);
-		    Thread.sleep(100);
+	            //V1Deployment body = (V1Deployment) Yaml.load(new File(info[2]));
+		    ArrayList<JsonObject> arr = new ArrayList<>();
+		    arr.add(((JsonElement) modelService.deserialize(info[2], JsonElement.class)).getAsJsonObject());
+		    V1Deployment result = null;
 	            Boolean run = false;
-	            if (info[3].contains("All")){
+	            if (info[3] != null && info[3].equals("All")){
 		        run = true;
-	            }
+	            } else {
+	                result = api.patchNamespacedDeployment(info[0], info[1], arr, null, null);
+		    }
+		    Thread.sleep(100);
 		    modelUpdateDelete(info[0], "Deployment", run);
-		    modelUpdateCreate(result, run);
+		    modelUpdateCreate(result, run, info[1]);
 		    return "Success";
 		} catch (Throwable e) {
-		    return e.getMessage();
+		    System.out.println(e);
+		    return Arrays.toString(e.getStackTrace());
 		}
 	    }	
 	}
@@ -104,19 +127,23 @@ public class DeploymentAction implements AtomicAction {
 	    try {
 	        Map<String, Map<String, Map<String, ArrayList>>> relationships = modelService.getRelationships(run);
 	        Map<String, ArrayList> model = modelService.getAllComponents(run);
-		Iterator<String> it = relationships.get(component).get(name).keySet().iterator();
-		while (it.hasNext()) {
-		    String k = it.next();
-	            model.get(k).removeAll(relationships.get(component).get(name).get(k));
-		}
 	        ArrayList<String> owners = new ArrayList<String>();
 	        owners.add(component + ":" + name);
 	        while (owners.size() > 0) {
 		    String owner = owners.remove(owners.size() - 1);
-		    System.out.println(owner);
 		    String[] parts = owner.split(":");
+	            model.get(parts[0]).removeIf(n -> {
+                            try {
+                            Method m = n.getClass().getMethod("getMetadata");
+                            V1ObjectMeta metadata = (V1ObjectMeta) m.invoke(n);
+                            return metadata.getName().equals(parts[1]);
+                            } catch (Exception e) {
+                                return false;
+                            }
+                    });
+
 		    if (relationships.get(parts[0]).get(parts[1]) != null){
-		        it =  relationships.get(parts[0]).get(parts[1]).keySet().iterator();
+		        Iterator<String> it =  relationships.get(parts[0]).get(parts[1]).keySet().iterator();
 		        while (it.hasNext()) {
 			    String k = it.next();
 		            int size = relationships.get(parts[0]).get(parts[1]).get(k).size();
@@ -124,18 +151,18 @@ public class DeploymentAction implements AtomicAction {
 			        Method m = relationships.get(parts[0]).get(parts[1]).get(k).get(counter).getClass().getMethod("getMetadata");
 			        V1ObjectMeta metadata = (V1ObjectMeta) m.invoke(relationships.get(parts[0]).get(parts[1]).get(k).get(counter));
 			        owners.add(k + ":" + metadata.getName());	
-		            }
-	                    relationships.get(parts[0]).get(parts[1]).remove(k);
+			    }
 	                };
+	                relationships.get(parts[0]).remove(parts[1]);
 		    }
 	        }
 	        modelService.setAllComponents(model, run);
 	        modelService.setRelationships(relationships, run);
 	    } catch (Exception e) {
-	        System.out.println(e);
+	        e.printStackTrace();
 	    }
 	}
-	public void modelUpdateCreate(V1Deployment result, Boolean run){
+	public String modelUpdateCreate(V1Deployment result, Boolean run, String namespace){
 	    try {
 	    String component = "Deployment";
 	    String secondary = "ReplicaSet";
@@ -145,6 +172,12 @@ public class DeploymentAction implements AtomicAction {
 	    Integer replicas = result.getSpec().getReplicas();
 	    Map<String, ArrayList> model = modelService.getAllComponents(run);
             Map<String, Map<String, Map<String, ArrayList>>> relationships = modelService.getRelationships(run);
+	    if (!model.get("Namespace").stream().anyMatch(c -> {
+		V1Namespace d = (V1Namespace) c;    
+	        return d.getMetadata().getName().equals(namespace);
+	    })){
+	    	return "No such namespace with name " + namespace + " found";
+	    }
 	    ArrayList<V1Deployment> deploymentList = model.get(component);
             ArrayList<V1ReplicaSet> rsList = model.get(secondary);
             ArrayList<V1Pod> podList = model.get(tertiary);
@@ -155,6 +188,7 @@ public class DeploymentAction implements AtomicAction {
 	        relationships.get(component).get(result.getMetadata().getName()).put(secondary, newrsList);
 	        String replica = newrsList.get(0).getMetadata().getName();
 	        relationships.get(secondary).put(replica, new HashMap<String, ArrayList>());
+
                 ArrayList<V1Pod> newPodList = (ArrayList) core.listNamespacedPod(result.getMetadata().getNamespace(),true,null,null,null,labels,null,null, null, null).getItems();
 	        podList.addAll(newPodList);
                 for (V1Pod item : newPodList){
@@ -200,8 +234,6 @@ public class DeploymentAction implements AtomicAction {
 		    model.get(tertiary).add(pod);
 		    podItems.add(pod);
 		}
-		System.out.println(rsItems);
-		System.out.println(podItems);
 	        relationships.get(secondary).put(replica, new HashMap<String, ArrayList>());
 	        relationships.get(secondary).get(replica).put(tertiary, podItems);
 	    }
@@ -209,8 +241,10 @@ public class DeploymentAction implements AtomicAction {
 	    deploymentList.add(result);
 	    modelService.setAllComponents(model, run);
 	    modelService.setRelationships(relationships, run);
+		return "Success";
 	    } catch (Exception e) {
 	    	e.printStackTrace();
+		return e.getMessage();
 	    }
 	}
 	public Object read(String[] info) {
@@ -222,7 +256,7 @@ public class DeploymentAction implements AtomicAction {
 	            V1Deployment result = api.readNamespacedDeployment(info[0], info[1], null, null, null);
 		    return result;
 		} catch (ApiException e) {
-		    return e.getMessage();
+		    return Arrays.toString(e.getStackTrace());
 		}
 	    }	
 	}
