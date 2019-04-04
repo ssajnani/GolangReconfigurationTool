@@ -33,7 +33,10 @@
             <artifactId>commons-lang3</artifactId>
             <version>3.8</version>
         </dependency>
- 
+    	<dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+        </dependency>     
     </dependencies>
 
     <properties>
@@ -55,11 +58,11 @@
 </profiles> 
 
     <build>
-        <plugins>
+	    <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-maven-plugin</artifactId>
-                <executions>
+		<executions>
                 <execution>
                   <goals>
                     <goal>repackage</goal>
