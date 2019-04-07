@@ -101,7 +101,7 @@ public class DeploymentAction implements AtomicAction {
 	    	return "Error: Please provide a valid deployment name, namespace, and a valid patch string in a string array in that order.";
 	    } else {
 		try {
-		    
+		    System.out.println(info.toString()); 
 	            //V1Deployment body = (V1Deployment) Yaml.load(new File(info[2]));
 		    ArrayList<JsonObject> arr = new ArrayList<>();
 		    arr.add(((JsonElement) modelService.deserialize(info[2], JsonElement.class)).getAsJsonObject());

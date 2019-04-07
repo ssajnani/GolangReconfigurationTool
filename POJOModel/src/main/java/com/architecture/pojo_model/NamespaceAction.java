@@ -38,6 +38,14 @@ public class NamespaceAction implements AtomicAction {
 		    }
 		    Map<String, ArrayList> model = modelService.getAllComponents(run);
 		    ArrayList<V1Namespace> namespaceList = model.get("Namespace");
+                    if (run && namespaceList.stream().anyMatch(c ->
+{
+                        V1Namespace d = (V1Namespace) c;
+			System.out.println(d.getMetadata().getName());
+                        return d.getMetadata().getName().equals(body.getMetadata().getName());
+                    })) {
+                        return "Namespace already exists";
+                    }
 		    namespaceList.add(result);
 		    model.put("Namespace", namespaceList);
 		    modelService.setAllComponents(model, run);

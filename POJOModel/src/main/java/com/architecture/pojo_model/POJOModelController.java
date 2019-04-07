@@ -77,13 +77,13 @@ public class POJOModelController {
 	                    JSONObject json = (JSONObject) parser.parse(req.body());
 			    String namespace = (String) json.get("namespace");
 			    String name = (String) json.get("name");
-			    String path = (String) json.get("filepath");
+			    String patchString = (String) json.get("patchString");
 		 	    String type = (String) json.get("type");
 		 	    String dryRun = null;
 		 	    if ((String) json.get("dryRun") != null) {
 			        dryRun = (String) json.get("dryRun");
 			    }
-			    String[] array = {name, namespace, path, dryRun};
+			    String[] array = {name, namespace, patchString, dryRun};
 			    POJOModelAction action = new POJOModelAction(type);
 			    String result = action.update(array);
 			    return result;

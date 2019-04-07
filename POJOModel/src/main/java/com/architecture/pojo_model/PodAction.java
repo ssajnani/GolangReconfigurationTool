@@ -101,13 +101,10 @@ public class PodAction implements AtomicAction {
                     }
                     Map<String, ArrayList> model = modelService.getAllComponents(run);
                     ArrayList<V1Pod> podList = model.get("Pod");
+		    System.out.println(result.getMetadata().getName());
 		    int listSize = podList.size();
 		    for (int i = 0; i < listSize; i++) {
                         V1Pod pod = podList.get(i);
-			List<V1OwnerReference> references = pod.getMetadata().getOwnerReferences();
-			if (references.size() > 0) {
-			    return "Cannot update pod because it is owned by: " + references.stream().map( n -> n.toString()).collect( Collectors.joining( "," ));
-			}
 			if (pod.getMetadata().getName() == info[0] && pod.getMetadata().getNamespace() == info[1]){
 			    podList.set(i, result);
 			}
